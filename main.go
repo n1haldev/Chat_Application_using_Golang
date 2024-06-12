@@ -2,11 +2,11 @@ package main
 
 import (
 	"net/http"
-	"github.com/n1haldev/Chat_Application_using_Golang/chat_app/websocket"
+	. "chat-app/websocket"
 )
 
 func main() {
 	server := NewServer()
-	http.HandleFunc("/ws", server.handleWS)
+	http.HandleFunc("/ws", server.HandleWS)
 	http.ListenAndServe(":3000", nil)
 }

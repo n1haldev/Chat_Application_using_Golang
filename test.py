@@ -6,7 +6,7 @@ import requests
 async def send_message(remote_addr):
     # Get list of available users
     try:
-        response = requests.get(f'http://localhost:3000/showUsers', headers={'X-Forwarded-For': remote_addr})
+        response = requests.get(f'http://localhost:3000/users', headers={'X-Forwarded-For': remote_addr})
         response.raise_for_status()
         print(response.text)
     except Exception as e:

@@ -32,14 +32,14 @@ func (s *Server) getClientName(ws *websocket.Conn) string {
 	return parts[3]
 }
 
-func (s *Server) ShowUsers(w http.ResponseWriter, _ *http.Request) {
-	var users[] string
-	for conn := range s.conns {
-		users = append(users, s.getClientName(conn))
-	}
-	usersList := strings.Join(users, ",")
-	w.Write([]byte("Available users are: "+usersList))
-}
+// func (s *Server) ShowUsers(w http.ResponseWriter, _ *http.Request) {
+// 	var users[] string
+// 	for conn := range s.conns {
+// 		users = append(users, s.getClientName(conn))
+// 	}
+// 	usersList := strings.Join(users, ",")
+// 	w.Write([]byte("Available users are: "+usersList))
+// }
 
 func (s *Server) HandleWS(w http.ResponseWriter, r *http.Request) {
 	cnn, err := upgrader.Upgrade(w, r, nil)
@@ -56,7 +56,7 @@ func (s *Server) HandleWS(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("New incoming connection: ", remoteAddr);
 
 	s.conns[cnn] = true;
-	// s.ShowUsers(cnn);
+	s.notifyUserListChange();
 	s.readLoop(cnn, string(remoteAddr));
 }
 
@@ -65,9 +65,24 @@ func (s *Server) broadcast(b []byte) {
 		go func(ws *websocket.Conn) {
 			if err := ws.WriteMessage(websocket.TextMessage, b); err != nil {
 				fmt.Println("write error: ", err);
+				ws.Close()
+				delete(s.conns, ws)
 			}
 		}(ws)
 	}
+}
+
+func (s *Server) ShowUsers() string {
+	var users []string
+	for conn := range s.conns {
+		users = append(users, s.getClientName(conn))
+	}
+	return strings.Join(users, ",")
+}
+
+func (s *Server) notifyUserListChange() {
+	userList := s.ShowUsers()
+	s.broadcast([]byte("Available users: " + userList))
 }
 
 func (s *Server) readLoop(ws *websocket.Conn, client string) {

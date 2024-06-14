@@ -8,14 +8,43 @@ import (
     "net/http"
     "os"
     "strings"
-	"sync"
 
     "github.com/gorilla/websocket"
 )
 
+func readMessages(conn *websocket.Conn) {
+    for {
+        _, message, err := conn.ReadMessage()
+        if err != nil {
+            log.Printf("Error reading message: %v\n", err)
+            return
+        }
+        fmt.Printf("Received: %s\n", message)
+        if strings.HasPrefix(string(message), "Connect to:") {
+            peerAddr := strings.TrimPrefix(string(message), "Connect to:")
+            startPeerToPeerChat(peerAddr)
+            return
+        }
+    }
+}
+
+func writeMessages(conn *websocket.Conn, reader *bufio.Reader) {
+    for {
+        fmt.Print("Enter message to send (type 'quit' to exit): ")
+        userMessage, _ := reader.ReadString('\n')
+        userMessage = strings.TrimSpace(userMessage)
+        if strings.ToLower(userMessage) == "quit" {
+            break
+        }
+        err := conn.WriteMessage(websocket.TextMessage, []byte(userMessage))
+        if err != nil {
+            log.Printf("Error sending message: %v\n", err)
+            return
+        }
+    }
+}
 
 func main() {
-	var wg sync.WaitGroup
     if len(os.Args) != 2 {
         fmt.Println("Usage: go run client.go <remote_address>")
         os.Exit(1)
@@ -32,43 +61,11 @@ func main() {
         return
     }
     defer conn.Close()
+    reader := bufio.NewReader(os.Stdin)
 
-	wg.Add(1);
+    go readMessages(conn)
 
-    go func() {
-        for {
-            _, message, err := conn.ReadMessage()
-            if err != nil {
-                log.Printf("Error reading message: %v\n", err)
-                return
-            }
-            fmt.Printf("Received: %s\n", message)
-            if strings.HasPrefix(string(message), "Connect to:") {
-                peerAddr := strings.TrimPrefix(string(message), "Connect to:")
-                startPeerToPeerChat(peerAddr)
-                return
-            }
-        }
-    }()
-
-    wg.Wait();
-
-	go func() {
-		reader := bufio.NewReader(os.Stdin)
-		for {
-			fmt.Print("Enter message to send (type 'quit' to exit): ")
-			userMessage, _ := reader.ReadString('\n')
-			userMessage = strings.TrimSpace(userMessage)
-			if strings.ToLower(userMessage) == "quit" {
-				break
-			}
-			err := conn.WriteMessage(websocket.TextMessage, []byte(userMessage))
-			if err != nil {
-				log.Printf("Error sending message: %v\n", err)
-				return
-			}
-		}
-	}()
+    writeMessages(conn, reader)
 }
 
 func startPeerToPeerChat(peerAddr string) {

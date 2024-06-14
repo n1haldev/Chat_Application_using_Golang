@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
@@ -37,6 +38,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 
 	remoteAddr := r.RemoteAddr;
 	client := &Client{conn: con, remoteIP: remoteAddr}
+	fmt.Println("New incoming connection: ", remoteAddr);
 
 	clientsLock.Lock();
 	clients[client] = true;
@@ -61,7 +63,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		targetClient := getClientByIP(string(msg))
 
 		if targetClient != nil {
-			notifyClient(targetClient, client.remoteIP);
+			notifyClient(client, targetClient, client.remoteIP);
 		}
 	}
 
@@ -88,44 +90,72 @@ func notifyUserListChange() {
 	}
 }
 
-func notifyClient(target *Client, requesterIP string) {
+func notifyClient(client *Client, target *Client, requesterIP string) {
 	msg := fmt.Sprintf("%v wants to connect and chat. Do you accept?(yes/no): ", requesterIP);
 	
 	if err := target.conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
 		log.Println("Error requesting user to connect: ", err);
 		return 
 	}
+	
+	for {
+		_, res, err := client.conn.ReadMessage();
+		if err != nil {
+			log.Println("Error reading response to invitation: ", err)
+			return 
+		}
+		str_res := strings.TrimSuffix(string(res), "\n")
+		log.Println(str_res)
 
-	_, res, err := target.conn.ReadMessage();
-	if err != nil {
-		log.Println("Error reading response to invitation: ", err)
-		return 
-	}
-
-	if string(res) == "yes" {
-		initiatePeerConnection(target, requesterIP);
+		if err := target.conn.WriteMessage(websocket.TextMessage, []byte(str_res)); err != nil {
+			log.Println("Error requesting user to connect: ", err);
+			return 
+		}
+	
+		// if string(str_res) == "yes" {
+		// 	// initiatePeerConnection(target, client);
+		// 	fmt.Println("Start communication")
+		// 	startCommunication(target, client);
+		// }
 	}
 }
 
-func initiatePeerConnection(client *Client, requesterIP string) {
-	requestingClient := getClientByIP(requesterIP);
-	if requestingClient != nil {
-		return
-	}
+func startCommunication(target *Client, client *Client) {
+	
+	go func ()  {
+		for {
+			_, res, err := client.conn.ReadMessage();
+			if err != nil {
+				log.Println("Error reading response to invitation: ", err)
+				return 
+			}
+			fmt.Println(string(res));
 
-	clientMessage := fmt.Sprintf("Connect to %s: ", client.remoteIP)
-	if err := requestingClient.conn.WriteMessage(websocket.TextMessage, []byte(clientMessage)); err != nil {
-		log.Println("Error sending peer into to requester: ", err)
-	}
-
-	requesterMessage := fmt.Sprintf("Connect to %s: ", requestingClient.remoteIP)
-	if err := client.conn.WriteMessage(websocket.TextMessage, []byte(requesterMessage)); err != nil {
-		log.Println("Error sending peer into to target: ", err)
-	}
-
-	client.conn.Close();
-	requestingClient.conn.Close();
+			if err := target.conn.WriteMessage(websocket.TextMessage, []byte(res)); err != nil {
+				log.Println("Error sending welcome message!")
+				return 
+			}
+		}
+	}()
 }
+
+// func initiatePeerConnection(target *Client, client *Client) {
+// 	fmt.Println("running initiatePeerConnection")
+
+// 	clientMessage := fmt.Sprintf("Connect to %s: ", client.remoteIP)
+// 	fmt.Println("server bombaclat")
+// 	if err := client.conn.WriteMessage(websocket.TextMessage, []byte(clientMessage)); err != nil {
+// 		log.Println("Error sending peer into to requester: ", err)
+// 	}
+
+// 	requesterMessage := fmt.Sprintf("Connect to %s: ", client.remoteIP)
+// 	if err := client.conn.WriteMessage(websocket.TextMessage, []byte(requesterMessage)); err != nil {
+// 		log.Println("Error sending peer into to target: ", err)
+// 	}
+
+// 	client.conn.Close();
+// 	target.conn.Close();
+// }
 
 func getClientByIP(remoteIP string) (*Client) {
 	clientsLock.Lock();

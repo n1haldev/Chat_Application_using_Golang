@@ -19,7 +19,7 @@ func readMessages(conn *websocket.Conn) {
             log.Printf("Error reading message: %v\n", err)
             return
         }
-        fmt.Printf("Received: %s\n", message)
+        fmt.Printf("Peer: %s\n", message)
         if strings.HasPrefix(string(message), "Connect to:") {
             peerAddr := strings.TrimPrefix(string(message), "Connect to:")
             startPeerToPeerChat(peerAddr)
@@ -30,7 +30,6 @@ func readMessages(conn *websocket.Conn) {
 
 func writeMessages(conn *websocket.Conn, reader *bufio.Reader) {
     for {
-        fmt.Print("Enter message to send (type 'quit' to exit): ")
         userMessage, _ := reader.ReadString('\n')
         userMessage = strings.TrimSpace(userMessage)
         if strings.ToLower(userMessage) == "quit" {

@@ -63,7 +63,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		targetClient := getClientByIP(string(msg))
 
 		if targetClient != nil {
-			notifyClient(client, targetClient, client.remoteIP);
+			notifyClient(client, targetClient);
 		}
 	}
 
@@ -90,14 +90,7 @@ func notifyUserListChange() {
 	}
 }
 
-func notifyClient(client *Client, target *Client, requesterIP string) {
-	msg := fmt.Sprintf("%v wants to connect and chat. Do you accept?(yes/no): ", requesterIP);
-	
-	if err := target.conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
-		log.Println("Error requesting user to connect: ", err);
-		return 
-	}
-	
+func notifyClient(client *Client, target *Client) {
 	for {
 		_, res, err := client.conn.ReadMessage();
 		if err != nil {
@@ -111,51 +104,9 @@ func notifyClient(client *Client, target *Client, requesterIP string) {
 			log.Println("Error requesting user to connect: ", err);
 			return 
 		}
-	
-		// if string(str_res) == "yes" {
-		// 	// initiatePeerConnection(target, client);
-		// 	fmt.Println("Start communication")
-		// 	startCommunication(target, client);
-		// }
 	}
 }
 
-func startCommunication(target *Client, client *Client) {
-	
-	go func ()  {
-		for {
-			_, res, err := client.conn.ReadMessage();
-			if err != nil {
-				log.Println("Error reading response to invitation: ", err)
-				return 
-			}
-			fmt.Println(string(res));
-
-			if err := target.conn.WriteMessage(websocket.TextMessage, []byte(res)); err != nil {
-				log.Println("Error sending welcome message!")
-				return 
-			}
-		}
-	}()
-}
-
-// func initiatePeerConnection(target *Client, client *Client) {
-// 	fmt.Println("running initiatePeerConnection")
-
-// 	clientMessage := fmt.Sprintf("Connect to %s: ", client.remoteIP)
-// 	fmt.Println("server bombaclat")
-// 	if err := client.conn.WriteMessage(websocket.TextMessage, []byte(clientMessage)); err != nil {
-// 		log.Println("Error sending peer into to requester: ", err)
-// 	}
-
-// 	requesterMessage := fmt.Sprintf("Connect to %s: ", client.remoteIP)
-// 	if err := client.conn.WriteMessage(websocket.TextMessage, []byte(requesterMessage)); err != nil {
-// 		log.Println("Error sending peer into to target: ", err)
-// 	}
-
-// 	client.conn.Close();
-// 	target.conn.Close();
-// }
 
 func getClientByIP(remoteIP string) (*Client) {
 	clientsLock.Lock();
@@ -168,23 +119,6 @@ func getClientByIP(remoteIP string) (*Client) {
 	}
 
 	return nil
-}
-
-func SendUserList(client *Client) {
-	clientsLock.Lock();
-	defer clientsLock.Unlock();
-
-	var userList[] string;
-	for con := range clients {
-		if con != client {
-			userList = append(userList, con.remoteIP);
-		}
-	}
-
-	userListMessage := fmt.Sprintf("Users: %v", userList);
-	if err := client.conn.WriteMessage(websocket.TextMessage, []byte(userListMessage)); err != nil {
-		log.Println("Error sending user list to client: ", err); 
-	}
 }
 
 func main() {
